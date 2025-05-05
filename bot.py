@@ -19,7 +19,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMINS = list(map(int, os.getenv("ADMINS", "").split(" ")))
 
 PORT = "8080"
-
+GWAY = False
 DATABASE_URI = os.getenv("DATABASE_URI")
 my_client = MongoClient(DATABASE_URI)
 mydb = my_client["cluster0"]
@@ -94,6 +94,7 @@ async def start(client, message: Message):
 
 @app.on_message(filters.command("giveaway") & filters.user(ADMINS))
 async def giveaway(client, message):
+    global GWAY
     b_id = await get_broadcast_channel()
     if not b_id:
         await message.reply("No broadcast channel set.")
@@ -123,6 +124,7 @@ async def giveaway(client, message):
         # Store message info for updates
     except Exception as e:
         await message.reply_text(f"Error sending giveaway message:\n`{e}`", quote=True)
+    GWAY = True
     await asyncio.sleep(60)
     global cached_count
     while True:
@@ -165,11 +167,17 @@ async def join_giveaway_callback(client, callback_query: CallbackQuery):
 
 @app.on_callback_query(filters.regex("count_participants"))
 async def count_partpants(client, callback_query: CallbackQuery):
+    global GWAY
     count = await get_user_count()
-    await callback_query.answer(f"Current Participants {count} !", show_alert=True)
+    if GWAY:
+        await callback_query.answer(f"Current Participants {count} !", show_alert=True)
+    else: 
+        await callback_query.answer("GIVEAWAY ENDED!", show_alert=True)
+    
 
 @app.on_message(filters.command("end") & filters.user(ADMINS))
 async def end_giveaway(client, message):
+    global GWAY
     try:
         number_to_pick = int(message.text.split()[1])
     except (IndexError, ValueError):
@@ -219,6 +227,7 @@ async def end_giveaway(client, message):
         f"Valid Participants: {valid_count}\n\n"
         f"Selected Winners:\n" + "\n".join(winner_text)
     )
+    GWAY = False
 
 @app.on_message(filters.command("delbc") & filters.user(ADMINS))
 async def clear_broadcast(client, message):
